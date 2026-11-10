@@ -8,6 +8,11 @@ interface ButtonDefinition {
   kind?: 'utility' | 'operator' | 'equals'
 }
 
+interface HistoryEntry {
+  expression: string
+  result: string
+}
+
 const buttons: ButtonDefinition[] = [
   { key: 'AC', label: 'AC', ariaLabel: 'borrar todo', kind: 'utility' },
   { key: '±', label: '±', ariaLabel: 'cambiar signo', kind: 'utility' },
@@ -40,20 +45,48 @@ function valueSize(value: string): string {
 
 export function createCalculator(root: HTMLElement): () => void {
   root.innerHTML = `
-    <section class="calculator" aria-label="Calculadora">
-      <div class="display" aria-label="Pantalla de la calculadora">
-        <div class="display-expression" data-expression aria-hidden="true">&nbsp;</div>
-        <output class="display-value" data-value aria-live="polite" aria-atomic="true">0</output>
-      </div>
-      <div class="keypad" data-keypad></div>
-      <p class="keyboard-hint">También podés usar el teclado</p>
-    </section>
+    <div class="calculator-layout">
+      <section class="calculator" aria-label="Calculadora">
+        <div class="display" aria-label="Pantalla de la calculadora">
+          <div class="display-expression" data-expression aria-hidden="true">&nbsp;</div>
+          <output class="display-value" data-value aria-live="polite" aria-atomic="true">0</output>
+        </div>
+        <div class="keypad" data-keypad></div>
+        <p class="keyboard-hint">También podés usar el teclado</p>
+      </section>
+      <aside class="history" aria-labelledby="history-title">
+        <div class="history-header">
+          <h2 id="history-title">Historial</h2>
+          <button
+            class="history-clear"
+            type="button"
+            data-clear-history
+            aria-label="Borrar historial"
+            disabled
+          >
+            Borrar todo
+          </button>
+        </div>
+        <p class="history-empty" data-history-empty>Todavía no hay cálculos.</p>
+        <ol class="history-list" data-history-list aria-live="polite"></ol>
+      </aside>
+    </div>
   `
 
   const keypad = root.querySelector<HTMLElement>('[data-keypad]')
   const expressionElement = root.querySelector<HTMLElement>('[data-expression]')
   const valueElement = root.querySelector<HTMLOutputElement>('[data-value]')
-  if (!keypad || !expressionElement || !valueElement) {
+  const historyList = root.querySelector<HTMLOListElement>('[data-history-list]')
+  const historyEmpty = root.querySelector<HTMLElement>('[data-history-empty]')
+  const clearHistoryButton = root.querySelector<HTMLButtonElement>('[data-clear-history]')
+  if (
+    !keypad ||
+    !expressionElement ||
+    !valueElement ||
+    !historyList ||
+    !historyEmpty ||
+    !clearHistoryButton
+  ) {
     throw new Error('No se pudo crear la calculadora')
   }
 
@@ -68,6 +101,30 @@ export function createCalculator(root: HTMLElement): () => void {
   }
 
   let state: CalculatorState = { ...initialState }
+  let history: HistoryEntry[] = []
+
+  const renderHistory = () => {
+    historyList.replaceChildren()
+
+    for (const entry of history) {
+      const item = document.createElement('li')
+      item.className = 'history-item'
+
+      const expression = document.createElement('span')
+      expression.className = 'history-expression'
+      expression.textContent = entry.expression
+
+      const result = document.createElement('strong')
+      result.className = 'history-result'
+      result.textContent = entry.result
+
+      item.append(expression, result)
+      historyList.append(item)
+    }
+
+    historyEmpty.hidden = history.length > 0
+    clearHistoryButton.disabled = history.length === 0
+  }
 
   const render = () => {
     const display = getDisplay(state)
@@ -77,8 +134,25 @@ export function createCalculator(root: HTMLElement): () => void {
   }
 
   const handleKey = (key: CalculatorKey) => {
-    state = press(state, key)
+    const nextState = press(state, key)
+    if (key === '=' && state.phase !== 'result' && nextState.phase === 'result') {
+      const display = getDisplay(nextState)
+      history = [
+        {
+          expression: display.expression,
+          result: display.value,
+        },
+        ...history,
+      ]
+      renderHistory()
+    }
+    state = nextState
     render()
+  }
+
+  const clearHistory = () => {
+    history = []
+    renderHistory()
   }
 
   const onClick = (event: Event) => {
@@ -87,6 +161,8 @@ export function createCalculator(root: HTMLElement): () => void {
   }
 
   const onKeydown = (event: KeyboardEvent) => {
+    if (event.target === clearHistoryButton && event.key === 'Enter') return
+
     const key = keyFromKeyboard(event.key)
     if (!key) return
     event.preventDefault()
@@ -94,11 +170,14 @@ export function createCalculator(root: HTMLElement): () => void {
   }
 
   keypad.addEventListener('click', onClick)
+  clearHistoryButton.addEventListener('click', clearHistory)
   document.addEventListener('keydown', onKeydown)
   render()
+  renderHistory()
 
   return () => {
     keypad.removeEventListener('click', onClick)
+    clearHistoryButton.removeEventListener('click', clearHistory)
     document.removeEventListener('keydown', onKeydown)
   }
 }
