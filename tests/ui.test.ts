@@ -1,15 +1,45 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createCalculator } from '../src/ui/app'
 
 describe('interfaz', () => {
   let cleanup: () => void
 
-  beforeEach(() => {
+  function mockMatchMedia(matches: boolean): void {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn().mockImplementation((query: string) => ({
+        matches,
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(() => true),
+      })),
+    )
+  }
+
+  function mountCalculator(): () => void {
     document.body.innerHTML = '<main id="app"></main>'
-    cleanup = createCalculator(document.querySelector('#app') as HTMLElement)
+    return createCalculator(document.querySelector('#app') as HTMLElement)
+  }
+
+  beforeEach(() => {
+    window.localStorage.clear()
+    delete document.documentElement.dataset.theme
+    document.head.innerHTML = '<meta name="theme-color" content="#0b1220">'
+    mockMatchMedia(false)
+    cleanup = mountCalculator()
   })
 
-  afterEach(() => cleanup())
+  afterEach(() => {
+    cleanup()
+    window.localStorage.clear()
+    delete document.documentElement.dataset.theme
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
 
   function value(): string {
     return document.querySelector('[data-value]')?.textContent ?? ''
@@ -46,7 +76,84 @@ describe('interfaz', () => {
     expect(document.querySelector('[aria-label="sumar"]')).not.toBeNull()
     expect(document.querySelector('[aria-label="borrar último dígito"]')).not.toBeNull()
     expect(document.querySelector('[aria-label="Borrar historial"]')).not.toBeNull()
+    expect(document.querySelector('[aria-label="Activar modo claro"]')).not.toBeNull()
     expect(document.querySelector('[data-value]')?.getAttribute('aria-live')).toBe('polite')
+  })
+
+  it('cambia el tema y actualiza el color del navegador', () => {
+    const themeButton = document.querySelector<HTMLButtonElement>('[data-theme-toggle]')
+
+    expect(document.documentElement.dataset.theme).toBe('dark')
+    themeButton?.click()
+
+    expect(document.documentElement.dataset.theme).toBe('light')
+    expect(themeButton?.getAttribute('aria-label')).toBe('Activar modo oscuro')
+    expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe(
+      '#f1f5f9',
+    )
+  })
+
+  it('guarda la elección y la respeta al volver a montar', () => {
+    document.querySelector<HTMLButtonElement>('[data-theme-toggle]')?.click()
+    expect(window.localStorage.getItem('calculator-theme')).toBe('light')
+
+    cleanup()
+    delete document.documentElement.dataset.theme
+    cleanup = mountCalculator()
+
+    expect(document.documentElement.dataset.theme).toBe('light')
+    expect(document.querySelector('[aria-label="Activar modo oscuro"]')).not.toBeNull()
+  })
+
+  it('usa la preferencia del sistema cuando no hay una elección guardada', () => {
+    cleanup()
+    mockMatchMedia(true)
+    delete document.documentElement.dataset.theme
+    cleanup = mountCalculator()
+
+    expect(window.matchMedia).toHaveBeenCalledWith('(prefers-color-scheme: light)')
+    expect(document.documentElement.dataset.theme).toBe('light')
+  })
+
+  it('sigue funcionando cuando localStorage está bloqueado', () => {
+    cleanup()
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('Storage blocked')
+    })
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('Storage blocked')
+    })
+    delete document.documentElement.dataset.theme
+    cleanup = mountCalculator()
+
+    expect(() => document.querySelector<HTMLButtonElement>('[data-theme-toggle]')?.click()).not.toThrow()
+    expect(document.documentElement.dataset.theme).toBe('light')
+  })
+
+  it('no calcula al activar con Enter el botón de tema', () => {
+    clickKeys(['2', '+', '3'])
+    const themeButton = document.querySelector<HTMLButtonElement>('[data-theme-toggle]')
+    themeButton?.focus()
+    const event = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      bubbles: true,
+      cancelable: true,
+    })
+    const allowsNativeActivation = themeButton?.dispatchEvent(event)
+    if (allowsNativeActivation) themeButton?.click()
+
+    expect(event.defaultPrevented).toBe(false)
+    expect(value()).toBe('3')
+    expect(document.documentElement.dataset.theme).toBe('light')
+  })
+
+  it('conserva el cálculo en curso al cambiar el tema', () => {
+    clickKeys(['8', '+', '4'])
+    document.querySelector<HTMLButtonElement>('[data-theme-toggle]')?.click()
+    expect(value()).toBe('4')
+
+    clickKeys(['='])
+    expect(value()).toBe('12')
   })
 
   it('agrega los cálculos completados al historial, del más reciente al más antiguo', () => {
