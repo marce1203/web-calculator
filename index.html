@@ -3,7 +3,26 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#111827" />
+    <meta name="theme-color" content="#0b1220" />
+    <script>
+      ;(() => {
+        let theme
+        try {
+          const savedTheme = localStorage.getItem('calculator-theme')
+          if (savedTheme === 'dark' || savedTheme === 'light') theme = savedTheme
+        } catch {}
+        if (!theme) {
+          try {
+            if (matchMedia('(prefers-color-scheme: light)').matches) theme = 'light'
+          } catch {}
+        }
+        theme ||= 'dark'
+        document.documentElement.dataset.theme = theme
+        document
+          .querySelector('meta[name="theme-color"]')
+          .setAttribute('content', theme === 'light' ? '#f1f5f9' : '#0b1220')
+      })()
+    </script>
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
     <meta
       name="description"

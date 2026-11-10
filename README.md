@@ -1,6 +1,6 @@
 # Calculadora web
 
-Calculadora estándar, responsive y accesible construida con Vite, TypeScript y DOM vanilla. El motor de cálculo está separado de la interfaz, usa aritmética decimal exacta con `big.js` y respeta la precedencia habitual de operadores.
+Calculadora estándar, responsive y accesible construida con Vite, TypeScript y DOM vanilla. Incluye modos claro y oscuro, recuerda el tema elegido y usa la preferencia del sistema como valor inicial. El motor de cálculo está separado de la interfaz, usa aritmética decimal exacta con `big.js` y respeta la precedencia habitual de operadores.
 
 ## Requisitos
 

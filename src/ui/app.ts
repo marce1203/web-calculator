@@ -1,5 +1,7 @@
 import { getDisplay, initialState, keyFromKeyboard, press } from '../calculator'
 import type { CalculatorKey, CalculatorState } from '../calculator'
+import { applyTheme, initializeTheme, saveTheme } from './theme'
+import type { Theme } from './theme'
 
 interface ButtonDefinition {
   key: CalculatorKey
@@ -45,31 +47,39 @@ function valueSize(value: string): string {
 
 export function createCalculator(root: HTMLElement): () => void {
   root.innerHTML = `
-    <div class="calculator-layout">
-      <section class="calculator" aria-label="Calculadora">
-        <div class="display" aria-label="Pantalla de la calculadora">
-          <div class="display-expression" data-expression aria-hidden="true">&nbsp;</div>
-          <output class="display-value" data-value aria-live="polite" aria-atomic="true">0</output>
-        </div>
-        <div class="keypad" data-keypad></div>
-        <p class="keyboard-hint">También podés usar el teclado</p>
-      </section>
-      <aside class="history" aria-labelledby="history-title">
-        <div class="history-header">
-          <h2 id="history-title">Historial</h2>
-          <button
-            class="history-clear"
-            type="button"
-            data-clear-history
-            aria-label="Borrar historial"
-            disabled
-          >
-            Borrar todo
-          </button>
-        </div>
-        <p class="history-empty" data-history-empty>Todavía no hay cálculos.</p>
-        <ol class="history-list" data-history-list aria-live="polite"></ol>
-      </aside>
+    <div class="app-shell">
+      <div class="app-toolbar">
+        <button class="theme-toggle" type="button" data-theme-toggle>
+          <span class="theme-toggle-icon" data-theme-icon aria-hidden="true"></span>
+          <span data-theme-label></span>
+        </button>
+      </div>
+      <div class="calculator-layout">
+        <section class="calculator" aria-label="Calculadora">
+          <div class="display" aria-label="Pantalla de la calculadora">
+            <div class="display-expression" data-expression aria-hidden="true">&nbsp;</div>
+            <output class="display-value" data-value aria-live="polite" aria-atomic="true">0</output>
+          </div>
+          <div class="keypad" data-keypad></div>
+          <p class="keyboard-hint">También podés usar el teclado</p>
+        </section>
+        <aside class="history" aria-labelledby="history-title">
+          <div class="history-header">
+            <h2 id="history-title">Historial</h2>
+            <button
+              class="history-clear"
+              type="button"
+              data-clear-history
+              aria-label="Borrar historial"
+              disabled
+            >
+              Borrar todo
+            </button>
+          </div>
+          <p class="history-empty" data-history-empty>Todavía no hay cálculos.</p>
+          <ol class="history-list" data-history-list aria-live="polite"></ol>
+        </aside>
+      </div>
     </div>
   `
 
@@ -79,13 +89,19 @@ export function createCalculator(root: HTMLElement): () => void {
   const historyList = root.querySelector<HTMLOListElement>('[data-history-list]')
   const historyEmpty = root.querySelector<HTMLElement>('[data-history-empty]')
   const clearHistoryButton = root.querySelector<HTMLButtonElement>('[data-clear-history]')
+  const themeButton = root.querySelector<HTMLButtonElement>('[data-theme-toggle]')
+  const themeIcon = root.querySelector<HTMLElement>('[data-theme-icon]')
+  const themeLabel = root.querySelector<HTMLElement>('[data-theme-label]')
   if (
     !keypad ||
     !expressionElement ||
     !valueElement ||
     !historyList ||
     !historyEmpty ||
-    !clearHistoryButton
+    !clearHistoryButton ||
+    !themeButton ||
+    !themeIcon ||
+    !themeLabel
   ) {
     throw new Error('No se pudo crear la calculadora')
   }
@@ -102,6 +118,21 @@ export function createCalculator(root: HTMLElement): () => void {
 
   let state: CalculatorState = { ...initialState }
   let history: HistoryEntry[] = []
+  let theme: Theme = initializeTheme()
+
+  const renderTheme = () => {
+    const nextThemeLabel = theme === 'dark' ? 'claro' : 'oscuro'
+    themeButton.setAttribute('aria-label', `Activar modo ${nextThemeLabel}`)
+    themeIcon.textContent = theme === 'dark' ? '☀' : '☾'
+    themeLabel.textContent = `Modo ${nextThemeLabel}`
+  }
+
+  const toggleTheme = () => {
+    theme = theme === 'dark' ? 'light' : 'dark'
+    applyTheme(theme)
+    saveTheme(theme)
+    renderTheme()
+  }
 
   const renderHistory = () => {
     historyList.replaceChildren()
@@ -162,6 +193,7 @@ export function createCalculator(root: HTMLElement): () => void {
 
   const onKeydown = (event: KeyboardEvent) => {
     if (event.target === clearHistoryButton && event.key === 'Enter') return
+    if (event.target === themeButton && (event.key === 'Enter' || event.key === ' ')) return
 
     const key = keyFromKeyboard(event.key)
     if (!key) return
@@ -171,13 +203,16 @@ export function createCalculator(root: HTMLElement): () => void {
 
   keypad.addEventListener('click', onClick)
   clearHistoryButton.addEventListener('click', clearHistory)
+  themeButton.addEventListener('click', toggleTheme)
   document.addEventListener('keydown', onKeydown)
+  renderTheme()
   render()
   renderHistory()
 
   return () => {
     keypad.removeEventListener('click', onClick)
     clearHistoryButton.removeEventListener('click', clearHistory)
+    themeButton.removeEventListener('click', toggleTheme)
     document.removeEventListener('keydown', onKeydown)
   }
 }
