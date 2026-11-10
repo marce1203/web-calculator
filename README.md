@@ -41,3 +41,11 @@ npm run preview
 ```
 
 La aplicación compilada queda en `dist/`.
+
+## Producción
+
+La calculadora está disponible en <https://marce1203.github.io/web-calculator/>. Cada merge a `main` publica automáticamente una nueva versión mediante GitHub Actions.
+
+Para iniciar una publicación manual, abrí **Actions → Deploy → Run workflow** en GitHub.
+
+Antes de la primera publicación, el manager debe configurar una única vez **Settings → Pages → Build and deployment → Source: GitHub Actions**. Si el repositorio es privado, GitHub Pages requiere un plan pago; como alternativa, el repositorio debe hacerse público.
