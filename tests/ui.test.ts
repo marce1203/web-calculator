@@ -76,4 +76,23 @@ describe('interfaz', () => {
     expect(clearButton?.disabled).toBe(true)
     expect(document.querySelector<HTMLElement>('[data-history-empty]')?.hidden).toBe(false)
   })
+
+  it('permite activar con Enter el botón enfocado para borrar el historial', () => {
+    clickKeys(['2', '+', '2', '='])
+    const clearButton = document.querySelector<HTMLButtonElement>('[data-clear-history]')
+    expect(clearButton).not.toBeNull()
+
+    clearButton?.focus()
+    const event = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      bubbles: true,
+      cancelable: true,
+    })
+    const allowsNativeActivation = clearButton?.dispatchEvent(event)
+    if (allowsNativeActivation) clearButton?.click()
+
+    expect(document.activeElement).toBe(clearButton)
+    expect(event.defaultPrevented).toBe(false)
+    expect(document.querySelectorAll('[data-history-list] li')).toHaveLength(0)
+  })
 })

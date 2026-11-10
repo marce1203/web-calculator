@@ -161,6 +161,8 @@ export function createCalculator(root: HTMLElement): () => void {
   }
 
   const onKeydown = (event: KeyboardEvent) => {
+    if (event.target === clearHistoryButton && event.key === 'Enter') return
+
     const key = keyFromKeyboard(event.key)
     if (!key) return
     event.preventDefault()
